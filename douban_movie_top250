@@ -1,0 +1,71 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+
+# 定义页面范围，0 到 250，每页间隔 25
+page_range = range(0, 250, 25)
+print(list(page_range))
+
+# 定义请求头，模拟浏览器发送请求
+headers = {
+    'User-Agent': """Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"""
+}
+
+# 存储电影信息的列表
+movies = []
+
+# 遍历每个页面
+for page in page_range:
+    # 构造页面 URL
+    url = f'https://movie.douban.com/top250?start={page}&filter='
+
+    # 发送 GET 请求
+    res = requests.get(url=url, headers=headers)
+
+    # 检查请求是否成功
+    if res.status_code == 200:
+        # 使用 BeautifulSoup 解析 HTML 文本
+        soup = BeautifulSoup(res.text, 'html.parser')
+
+        # 查找包含所有电影条目的列表
+        items = (soup.find('div', class_='article')
+                 .find('ol', class_='grid_view')
+                 .find_all('li'))
+
+        # 遍历每个电影条目
+        for item in items:
+            # 提取排名
+            rank = item.find('div', class_='pic').find('em').get_text()
+
+            # 提取电影标题
+            title = item.find('div', class_='hd').find('span', class_='title').get_text()
+
+            # 提取评分
+            rating = item.find('div', class_='star').find('span', class_='rating_num').get_text()
+
+            # 获取评论数
+            star_spans = item.find('div', class_='star').find_all('span')
+            comment = star_spans[3].get_text() if len(star_spans) > 3 else 'No comments'
+
+            # 将电影信息存储到字典中
+            movie_info = {
+                'Rank': rank,
+                'Title': title,
+                'Rating': rating,
+                'Comments': comment
+            }
+
+            # 将字典添加到电影列表中
+            movies.append(movie_info)
+    else:
+        # 如果请求失败，打印错误信息
+        print(f"Failed to retrieve page {page}. Status code: {res.status_code}")
+
+# 将电影信息列表转换为 DataFrame
+df = pd.DataFrame(movies)
+
+# 打印 DataFrame
+print(df)
+
+# 将 DataFrame 保存到 CSV 文件
+df.to_csv('douban_top250_movies.csv', index=False)
